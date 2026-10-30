@@ -39,23 +39,26 @@ jobs:
             javap -cp "$MC" net.minecraft.client.gui.Gui | grep -iE 'hide|hidden|visible|screen'
           } > inspect.txt 2>&1 || true
           cat inspect.txt
-          cat inspect.txt >> build.log
           # Выносим ошибки в аннотации, чтобы их было видно без входа в GitHub
           python3 - <<'EOF'
           import re
+          def emit(title, text):
+              for k in range(0, min(len(text), 30000), 3000):
+                  part = text[k:k+3000].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+                  print(f'::error title={title} {k//3000:02d}::{part}')
           log = open('build.log', encoding='utf-8', errors='replace').read().splitlines()
-          chunks, cur = [], []
+          seen, out = set(), []
           for i, l in enumerate(log):
-              if re.search(r'error:|What went wrong|Could not|FAILURE|Exception', l):
-                  cur.extend(log[max(0, i-1): i+6])
-          text = '\n'.join(cur) or '\n'.join(log[-80:])
+              if re.search(r'error:|What went wrong', l):
+                  block = '\n'.join(log[i:i+4])
+                  key = re.sub(r'^\s+', '', l)
+                  if key not in seen:
+                      seen.add(key); out.append(block)
+          emit('errors', '\n'.join(out) or '\n'.join(log[-60:]))
           try:
-              text = open('inspect.txt', encoding='utf-8', errors='replace').read() + '\n#####\n' + text
+              emit('inspect', open('inspect.txt', encoding='utf-8', errors='replace').read())
           except OSError:
               pass
-          for k in range(0, min(len(text), 36000), 3500):
-              part = text[k:k+3500].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
-              print(f'::error title=build log {k//3500}::{part}')
           EOF
       - uses: actions/upload-artifact@v4
         if: success()
