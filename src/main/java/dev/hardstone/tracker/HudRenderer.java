@@ -34,7 +34,7 @@ public class HudRenderer {
 
     public void extract(GuiGraphicsExtractor g, DeltaTracker delta) {
         Minecraft mc = Minecraft.getInstance();
-        if (!data.hudEnabled || mc.options.hideGui || mc.player == null) return;
+        if (!data.hudEnabled || mc.player == null) return;
         // Показываем только на Hypixel в SkyBlock или если включён режим «везде»
         if (!data.countEverywhere && !(location.isOnHypixel() && "SKYBLOCK".equals(location.gametype))) return;
 
