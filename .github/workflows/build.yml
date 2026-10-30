@@ -24,6 +24,22 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          # Справка по API: классы client command API и поля «скрытия интерфейса»
+          {
+            for j in $(find ~/.gradle/caches -name 'fabric-command-api-v2*.jar' | grep -v sources | head -2); do
+              echo "== $j"; unzip -l "$j" | grep -o 'net/fabricmc/fabric/api/[^ ]*\.class'
+            done
+            MC=$(for j in $(find ~/.gradle/caches -name '*.jar'); do unzip -l "$j" 2>/dev/null | grep -q ' net/minecraft/client/Options.class' && echo "$j"; done | head -1)
+            CMD=$(find ~/.gradle/caches -name 'fabric-command-api-v2*.jar' | grep -v sources | head -1)
+            echo "== MC $MC"
+            for c in $(unzip -l "$CMD" | grep -o 'net/fabricmc/fabric/api/client/command/v2/[A-Za-z]*\.class' | sed 's#/#.#g;s#\.class##'); do
+              javap -cp "$CMD:$MC" "$c" | grep -E 'static|class|interface' | head -12
+            done
+            javap -cp "$MC" net.minecraft.client.Options | grep -iE 'hide|gui'
+            javap -cp "$MC" net.minecraft.client.gui.Gui | grep -iE 'hide|hidden|visible|screen'
+          } > inspect.txt 2>&1 || true
+          cat inspect.txt
+          cat inspect.txt >> build.log
           # Выносим ошибки в аннотации, чтобы их было видно без входа в GitHub
           python3 - <<'EOF'
           import re
@@ -33,6 +49,10 @@ jobs:
               if re.search(r'error:|What went wrong|Could not|FAILURE|Exception', l):
                   cur.extend(log[max(0, i-1): i+6])
           text = '\n'.join(cur) or '\n'.join(log[-80:])
+          try:
+              text = open('inspect.txt', encoding='utf-8', errors='replace').read() + '\n#####\n' + text
+          except OSError:
+              pass
           for k in range(0, min(len(text), 36000), 3500):
               part = text[k:k+3500].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
               print(f'::error title=build log {k//3500}::{part}')
