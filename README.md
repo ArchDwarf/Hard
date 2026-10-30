@@ -1,5 +1,8 @@
 # Hard Stone Tracker — Fabric 26.2
 
+[![Build mod](https://github.com/ArchDwarf/hard/actions/workflows/build.yml/badge.svg)](https://github.com/ArchDwarf/hard/actions/workflows/build.yml)
+
+
 Клиентский мод для Hypixel SkyBlock: HUD со статистикой добытого Hard Stone и топ игроков по коллекции.
 
 ## Что умеет
