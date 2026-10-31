@@ -73,6 +73,8 @@ public class HudRenderer {
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
                 mining.isPaused() ? RED : WHITE));
+        lines.add(new Line("Рекорд/ч: " + Fmt.compact(data.bestBlocksPerHour)
+                + "  Всего: " + Fmt.compact(data.allTimeBlocks), GRAY));
 
         if (data.hudShowTop) {
             lines.add(new Line("Глобальное место: " + (globalRank.known() ? globalRank.describe()
