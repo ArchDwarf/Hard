@@ -79,9 +79,9 @@ public class HudRenderer {
         lines.add(new Line("Рекорд/ч: " + Fmt.compact(data.bestBlocksPerHour)
                 + "  Всего: " + Fmt.compact(data.allTimeBlocks), GRAY));
 
-        if (data.hudShowTop) {
+        {
             lines.add(new Line("Глобальное место: " + (globalRank.known() ? globalRank.describe()
-                    : "/hs top — ссылка на Elite Skyblock"), globalRank.known() ? GOLD : GRAY));
+                    : "открой Collections (Collection rankings)"), globalRank.known() ? GOLD : GRAY));
             if (globalRank.known()) {
                 long tu = globalRank.secondsUntilUpdate();
                 lines.add(new Line(tu > 0 ? "Обновление топа через " + Fmt.hms(tu)
