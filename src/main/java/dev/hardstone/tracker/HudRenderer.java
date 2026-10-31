@@ -54,8 +54,8 @@ public class HudRenderer {
                     + "  (" + Fmt.compact(mining.sackPerHour()) + "/ч)", AQUA));
         }
         if (collection.enabled()) {
-            long g = collection.gained();
-            String v = collection.error() != null ? collection.error() : g < 0 ? "загрузка..." : "+" + Fmt.num(g);
+            long gain = collection.gained();
+            String v = collection.error() != null ? collection.error() : gain < 0 ? "загрузка..." : "+" + Fmt.num(gain);
             lines.add(new Line("Коллекция (API): " + v, GREEN));
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
