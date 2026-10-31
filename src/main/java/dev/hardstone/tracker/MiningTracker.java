@@ -58,6 +58,8 @@ public class MiningTracker {
 
     // ---- текущая сессия ----
     public long sessionBlocks = 0;
+    /** Блоки, по которым ты бил напрямую (без Spread/способностей) */
+    public long sessionHits = 0;
     public long sessionSackItems = 0;
     public long sessionActiveMs = 0;
     /** Сколько блоков сломано последним ударом (для HUD) */
@@ -83,6 +85,11 @@ public class MiningTracker {
 
     public double perHour() {
         return sessionActiveMs < 10_000 ? 0 : sessionBlocks / (sessionActiveMs / 3_600_000.0);
+    }
+
+    /** Фактический Spread за сессию: доп. блоков на 100 ударов */
+    public double actualSpread() {
+        return sessionHits == 0 ? 0 : (sessionBlocks - sessionHits) * 100.0 / sessionHits;
     }
 
     public double sackPerHour() {
@@ -144,7 +151,8 @@ public class MiningTracker {
         // 3. Ищем исчезнувший камень (только если игрок не телепортировался)
         boolean teleported = Math.abs(cx - prevCx) > 4 || Math.abs(cy - prevCy) > 4 || Math.abs(cz - prevCz) > 4;
         if (havePrev && !teleported && now - lastActionMs < ACTIVE_MS) {
-            int mined = 0;
+            int mined = 0, hits = 0;
+            long target = lastTarget != null ? lastTarget.asLong() : Long.MIN_VALUE;
             LongIterator it = prevStone.iterator();
             while (it.hasNext()) {
                 long l = it.nextLong();
@@ -155,9 +163,10 @@ public class MiningTracker {
                 if (isRelatedToPlayer(x, y, z, now)) {
                     recentMined.put(l, now);
                     mined++;
+                    if (l == target) hits++;
                 }
             }
-            if (mined > 0) onBlocksMined(mined, now);
+            if (mined > 0) onBlocksMined(mined, Math.max(hits, 1), now);
         }
 
         // чистим старые записи цепочек
@@ -187,7 +196,8 @@ public class MiningTracker {
         return false;
     }
 
-    private void onBlocksMined(int count, long now) {
+    private void onBlocksMined(int count, int hits, long now) {
+        sessionHits += hits;
         if (isPaused()) lastTickMs = now; // выходим из паузы без «прыжка» таймера
         lastMinedMs = now;
         sessionBlocks += count;
@@ -242,6 +252,7 @@ public class MiningTracker {
             while (data.sessions.size() > 20) data.sessions.remove(data.sessions.size() - 1);
         }
         sessionBlocks = 0;
+        sessionHits = 0;
         sessionSackItems = 0;
         sessionActiveMs = 0;
         lastMinedMs = 0;

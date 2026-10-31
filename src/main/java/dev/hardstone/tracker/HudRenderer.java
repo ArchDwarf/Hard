@@ -25,14 +25,16 @@ public class HudRenderer {
     private final LocationTracker location;
     private final LeaderboardService leaderboard;
     private final CollectionTracker collection;
+    private final StatsReader stats;
 
     public HudRenderer(TrackerData data, MiningTracker mining, LocationTracker location, LeaderboardService leaderboard,
-                       CollectionTracker collection) {
+                       CollectionTracker collection, StatsReader stats) {
         this.data = data;
         this.mining = mining;
         this.location = location;
         this.leaderboard = leaderboard;
         this.collection = collection;
+        this.stats = stats;
     }
 
     public void extract(GuiGraphicsExtractor g, DeltaTracker delta) {
@@ -53,6 +55,12 @@ public class HudRenderer {
             lines.add(new Line("Дроп (сакс): " + Fmt.num(mining.sessionSackItems)
                     + "  (" + Fmt.compact(mining.sackPerHour()) + "/ч)", AQUA));
         }
+        double dpb = stats.dropsPerBlock();
+        lines.add(new Line("Удача: " + Fmt.num(Math.round(stats.totalFortune()))
+                + String.format(java.util.Locale.ROOT, " (x%.2f/блок)", dpb)
+                + "  Spread: " + Fmt.num(Math.round(stats.miningSpread())), GRAY));
+        lines.add(new Line("Дроп (формула): " + Fmt.num(Math.round(mining.sessionBlocks * dpb))
+                + "  (" + Fmt.compact(mining.perHour() * dpb) + "/ч)", AQUA));
         if (collection.enabled()) {
             long gain = collection.gained();
             String v = collection.error() != null ? collection.error() : gain < 0 ? "загрузка..." : "+" + Fmt.num(gain);

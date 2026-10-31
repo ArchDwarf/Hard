@@ -22,6 +22,14 @@ public class TrackerData {
     public int hudY = 4;
     /** Считать блоки в любом месте (для теста в одиночке), а не только в шахтах Hypixel */
     public boolean countEverywhere = false;
+    /** Читать Mining Fortune / Block Fortune / Mining Spread из таб-листа */
+    public boolean autoStats = true;
+    /** Ручные значения (если в табе их нет) */
+    public double miningFortune = 0;
+    public double blockFortune = 0;
+    public double miningSpread = 0;
+    /** Когда статы последний раз прочитаны из меню профиля (0 = никогда) */
+    public long statsFromMenuAt = 0;
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
     public String hypixelApiKey = "";

@@ -1,6 +1,7 @@
 package dev.hardstone.tracker;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -38,6 +39,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     private MiningTracker mining;
     private LeaderboardService leaderboard;
     private CollectionTracker collection;
+    private StatsReader stats;
 
     @Override
     public void onInitializeClient() {
@@ -46,11 +48,13 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         mining = new MiningTracker(data, location);
         leaderboard = new LeaderboardService(data);
         collection = new CollectionTracker(data, leaderboard);
-        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection);
+        stats = new StatsReader(data);
+        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection, stats);
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             location.tick(mc);
             mining.tick(mc);
+            stats.tick(mc);
             if (mc.player != null && location.isOnHypixel()) leaderboard.autoRefresh(mc.getUser().getName());
             if (mc.player != null) collection.tick(mc.getUser().getName(), location.isOnHypixel());
         });
@@ -88,6 +92,25 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                     return 1;
                 }))
                 .then(literal("sessions").executes(this::cmdSessions))
+                .then(literal("formula").executes(this::cmdFormula))
+                .then(literal("fortune").then(argument("mining", DoubleArgumentType.doubleArg(0, 100000))
+                        .executes(c -> setFortune(c, DoubleArgumentType.getDouble(c, "mining"), data.blockFortune))
+                        .then(argument("block", DoubleArgumentType.doubleArg(0, 100000))
+                                .executes(c -> setFortune(c, DoubleArgumentType.getDouble(c, "mining"),
+                                        DoubleArgumentType.getDouble(c, "block"))))))
+                .then(literal("spread").then(argument("value", DoubleArgumentType.doubleArg(0, 100000)).executes(c -> {
+                    data.miningSpread = DoubleArgumentType.getDouble(c, "value");
+                    data.save();
+                    ok(c, "Mining Spread = " + Fmt.num(Math.round(data.miningSpread))
+                            + (stats.tabSpread ? " (но сейчас берётся из таба: " + Fmt.num(Math.round(stats.miningSpread())) + ")" : ""));
+                    return 1;
+                })))
+                .then(literal("autostats").executes(c -> {
+                    data.autoStats = !data.autoStats;
+                    data.save();
+                    ok(c, "Авто-чтение статов (таб / меню профиля): " + onOff(data.autoStats));
+                    return 1;
+                }))
                 .then(literal("anywhere").executes(c -> {
                     data.countEverywhere = !data.countEverywhere;
                     data.save();
@@ -173,6 +196,10 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 {"/hs", "статистика сессии"},
                 {"/hs reset", "сохранить и начать новую сессию"},
                 {"/hs sessions", "топ твоих лучших сессий"},
+                {"/hs formula", "удача/Spread и расчёт дропа по формуле"},
+                {"/hs fortune <MF> [BF]", "вручную: Mining + Block Fortune"},
+                {"/hs spread <число>", "вручную: Mining Spread"},
+                {"/hs autostats", "вкл/выкл чтение статов из таба/меню"},
                 {"/hs top", "топ игроков по коллекции Hard Stone"},
                 {"/hs top boards", "официальные лидерборды Hypixel"},
                 {"/hs top board <path>|auto", "выбрать доску Hypixel"},
@@ -210,6 +237,40 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         send(s, kv("Дроп в сакс", Fmt.num(data.allTimeSackItems)));
         send(s, kv("Время добычи", Fmt.time(data.allTimeActiveMs)));
         send(s, kv("Рекорд блоков/ч", Fmt.num(Math.round(data.bestBlocksPerHour)) + " (сессии от 5 мин)"));
+        return 1;
+    }
+
+    private int setFortune(CommandContext<FabricClientCommandSource> c, double mf, double bf) {
+        data.miningFortune = mf;
+        data.blockFortune = bf;
+        data.save();
+        ok(c, "Mining Fortune = " + Fmt.num(Math.round(mf)) + ", Block Fortune = " + Fmt.num(Math.round(bf))
+                + ((stats.tabMf || stats.tabBf) ? " (но сейчас статы берутся из таба — /hs autostats чтобы выключить)" : ""));
+        return 1;
+    }
+
+    private int cmdFormula(CommandContext<FabricClientCommandSource> c) {
+        FabricClientCommandSource s = c.getSource();
+        send(s, header("Расчёт по формулам вики"));
+        send(s, kv("Источник статов", stats.source()));
+        send(s, kv("Mining Fortune", Fmt.num(Math.round(stats.miningFortune()))));
+        send(s, kv("Block Fortune", Fmt.num(Math.round(stats.blockFortune()))));
+        send(s, kv("Удача на Hard Stone", Fmt.num(Math.round(stats.totalFortune()))
+                + "  →  дроп с блока = 1 + " + Fmt.num(Math.round(stats.totalFortune())) + "/100 = x"
+                + String.format(java.util.Locale.ROOT, "%.2f", stats.dropsPerBlock())));
+        send(s, kv("Mining Spread", Fmt.num(Math.round(stats.miningSpread()))
+                + "  →  блоков с удара = x" + String.format(java.util.Locale.ROOT, "%.2f", stats.blocksPerHit())));
+        send(s, kv("Факт. Spread за сессию", mining.sessionHits == 0 ? "нет данных"
+                : Fmt.num(Math.round(mining.actualSpread())) + " (" + Fmt.num(mining.sessionBlocks) + " блоков / "
+                + Fmt.num(mining.sessionHits) + " ударов)"));
+        long est = Math.round(mining.sessionBlocks * stats.dropsPerBlock());
+        send(s, kv("Дроп по формуле", Fmt.num(mining.sessionBlocks) + " блоков × "
+                + String.format(java.util.Locale.ROOT, "%.2f", stats.dropsPerBlock()) + " = " + Fmt.num(est)));
+        long g = collection.gained();
+        if (g >= 0) send(s, kv("Дроп по API", Fmt.num(g) + "  (разница из-за задержки API и случайности)"));
+        send(s, Component.literal("Статы уже включают питомца, броню, атрибуты, HotM и т.д. — Hypixel суммирует их сам. "
+                + "Включи Mining Fortune, Block Fortune и Mining Spread в виджете Stats таб-листа, "
+                + "или открой SkyBlock Menu → Your SkyBlock Profile.").withStyle(ChatFormatting.DARK_GRAY));
         return 1;
     }
 
