@@ -16,6 +16,15 @@ final class Fmt {
         return num(Math.round(v));
     }
 
+    static String mmss(long sec) {
+        return String.format(Locale.ROOT, "%d:%02d", sec / 60, sec % 60);
+    }
+
+    static String hms(long sec) {
+        if (sec >= 3600) return String.format(Locale.ROOT, "%dч %02dм", sec / 3600, (sec / 60) % 60);
+        return mmss(sec);
+    }
+
     static String time(long ms) {
         long s = ms / 1000;
         return String.format(Locale.ROOT, "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60);

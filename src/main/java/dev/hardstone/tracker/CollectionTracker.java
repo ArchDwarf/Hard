@@ -29,6 +29,13 @@ public class CollectionTracker {
     }
 
     public long total() { return latest; }
+    public boolean isLoading() { return running; }
+
+    /** Секунд до следующего запроса к API, -1 если ещё не запрашивали */
+    public long secondsUntilNext() {
+        if (lastFetchMs == 0) return -1;
+        return Math.max(0, (lastFetchMs + INTERVAL_MS - System.currentTimeMillis()) / 1000);
+    }
     public String error() { return error; }
     public boolean enabled() { return !data.hypixelApiKey.isBlank(); }
 

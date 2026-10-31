@@ -51,9 +51,6 @@ public class HudRenderer {
         boolean counting = mining.isCountingHere();
         lines.add(new Line("Локация: " + (data.countEverywhere ? "везде" : location.prettyLocation()),
                 counting ? GREEN : GRAY));
-        lines.add(new Line("Блоков: " + Fmt.num(mining.sessionBlocks)
-                + (mining.lastBurst > 1 ? "  (+" + mining.lastBurst + " за удар)" : ""), WHITE));
-        lines.add(new Line("Блоков/ч: " + Fmt.compact(mining.perHour()), YELLOW));
         if (mining.sessionSackItems > 0) {
             lines.add(new Line("Дроп (сакс): " + Fmt.num(mining.sessionSackItems)
                     + "  (" + Fmt.compact(mining.sackPerHour()) + "/ч)", AQUA));
@@ -70,27 +67,21 @@ public class HudRenderer {
         if (collection.enabled()) {
             long gain = collection.gained();
             String v = collection.error() != null ? collection.error() : gain < 0 ? "загрузка..." : "+" + Fmt.num(gain);
-            lines.add(new Line("Коллекция (API): " + v, GREEN));
+            long next = collection.secondsUntilNext();
+            lines.add(new Line("Коллекция (API): " + v
+                    + (collection.isLoading() ? "  · обновляю..." : next >= 0 ? "  · обн. через " + Fmt.mmss(next) : ""), GREEN));
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
                 mining.isPaused() ? RED : WHITE));
-        lines.add(new Line("Рекорд/ч: " + Fmt.compact(data.bestBlocksPerHour)
-                + "  Всего: " + Fmt.compact(data.allTimeBlocks), GRAY));
 
         if (data.hudShowTop) {
             lines.add(new Line("Глобальное место: " + (globalRank.known() ? globalRank.describe()
                     : "открой Collections → Leaderboards"), globalRank.known() ? GOLD : GRAY));
-        }
-        if (data.hudShowTop && !leaderboard.top().isEmpty()) {
-            lines.add(new Line("Сравнение (личные коллекции):", GOLD));
-            String self = mc.getUser().getName();
-            int i = 1;
-            for (LeaderboardService.Entry e : leaderboard.top()) {
-                if (i > 5) break;
-                String val = e.hardStone() >= 0 ? Fmt.compact(e.hardStone()) : "—";
-                lines.add(new Line("#" + i + " " + e.name() + "  " + val,
-                        e.name().equalsIgnoreCase(self) ? GREEN : WHITE));
-                i++;
+            if (globalRank.known()) {
+                long tu = globalRank.secondsUntilUpdate();
+                lines.add(new Line(tu > 0 ? "Обновление топа через " + Fmt.hms(tu)
+                        : tu == 0 ? "Топ обновился — открой Leaderboards"
+                        : "Обновлено " + globalRank.ago() + " назад", GRAY));
             }
         }
 

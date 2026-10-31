@@ -61,7 +61,6 @@ public class HardStoneTrackerClient implements ClientModInitializer {
             stats.tick(mc);
             startup.tick(mc);
             globalRank.tick(mc);
-            if (mc.player != null && location.isOnHypixel()) leaderboard.autoRefresh(mc.getUser().getName());
             if (mc.player != null) collection.tick(mc.getUser().getName(), location.isOnHypixel());
         });
 

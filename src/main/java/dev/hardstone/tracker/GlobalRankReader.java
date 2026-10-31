@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
  */
 public class GlobalRankReader {
     private static final Pattern RANK = Pattern.compile("#\\s*([\\d,]+)");
+    private static final Pattern DUR = Pattern.compile("(\\d+)\\s*([dhms])\\b");
     private static final Pattern PERCENT = Pattern.compile("[Tt]op\\s*([\\d.,]+)\\s*%");
 
     private final TrackerData data;
@@ -46,6 +47,7 @@ public class GlobalRankReader {
             if (lore == null) continue;
             Long rank = null;
             Double pct = null;
+            Long updateIn = null;
             for (Component line : lore.lines()) {
                 String t = line.getString().replaceAll("§.", "");
                 String low = t.toLowerCase(Locale.ROOT);
@@ -54,6 +56,9 @@ public class GlobalRankReader {
                     Matcher m = RANK.matcher(t);
                     if (m.find()) rank = parseLong(m.group(1));
                 }
+                if (updateIn == null && (low.contains("update") || low.contains("refresh") || low.contains("reset"))) {
+                    updateIn = parseDuration(low);
+                }
                 if (pct == null) {
                     Matcher m = PERCENT.matcher(t);
                     if (m.find()) {
@@ -61,6 +66,7 @@ public class GlobalRankReader {
                     }
                 }
             }
+            if (updateIn != null && updateIn > 0) data.globalNextUpdateAt = now + updateIn * 1000;
             if (rank != null && rank > 0) {
                 if (rank != data.globalRank || (pct != null && pct != data.globalTopPercent)) {
                     data.globalRank = rank;
@@ -73,6 +79,37 @@ public class GlobalRankReader {
                 return;
             }
         }
+    }
+
+    /** "1h 23m", "5m 10s", "2d 3h" → секунды */
+    private static Long parseDuration(String s) {
+        Matcher m = DUR.matcher(s);
+        long total = 0;
+        boolean any = false;
+        while (m.find()) {
+            long v = Long.parseLong(m.group(1));
+            switch (m.group(2)) {
+                case "d" -> total += v * 86400;
+                case "h" -> total += v * 3600;
+                case "m" -> total += v * 60;
+                default -> total += v;
+            }
+            any = true;
+        }
+        return any ? total : null;
+    }
+
+    /** Секунд до обновления топа: &gt;0 — отсчёт, 0 — уже обновился, -1 — неизвестно */
+    public long secondsUntilUpdate() {
+        if (data.globalNextUpdateAt <= 0) return -1;
+        return Math.max(0, (data.globalNextUpdateAt - System.currentTimeMillis()) / 1000);
+    }
+
+    public String ago() {
+        long m = (System.currentTimeMillis() - data.globalRankAt) / 60_000;
+        if (m < 60) return m + " мин";
+        if (m < 48 * 60) return (m / 60) + " ч";
+        return (m / 1440) + " дн";
     }
 
     private static Long parseLong(String s) {
@@ -89,8 +126,6 @@ public class GlobalRankReader {
         if (!known()) return "неизвестно";
         String s = "#" + Fmt.num(data.globalRank);
         if (data.globalTopPercent > 0) s += " (топ " + data.globalTopPercent + "%)";
-        long h = (System.currentTimeMillis() - data.globalRankAt) / 3_600_000;
-        if (h >= 1) s += ", " + h + " ч назад";
         return s;
     }
 }

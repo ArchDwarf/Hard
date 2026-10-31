@@ -34,6 +34,8 @@ public class TrackerData {
     public long globalRank = 0;
     public double globalTopPercent = 0;
     public long globalRankAt = 0;
+    /** Когда Hypixel обновит лидерборд (если указано в меню), 0 = неизвестно */
+    public long globalNextUpdateAt = 0;
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
     public String hypixelApiKey = "";
