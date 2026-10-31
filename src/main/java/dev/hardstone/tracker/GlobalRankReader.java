@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public class GlobalRankReader {
     private static final Pattern RANK = Pattern.compile("#\\s*([\\d,]+)");
     private static final Pattern DUR = Pattern.compile("(\\d+)\\s*([dhms])\\b");
+    private static final Pattern MENU_LINE = Pattern.compile("^Hard Stone:\\s*([\\d,]+)(?:\\s*\\(Top\\s*([\\d.,]+)\\s*%\\))?");
     private static final Pattern PERCENT = Pattern.compile("[Tt]op\\s*([\\d.,]+)\\s*%");
 
     private final TrackerData data;
@@ -37,6 +38,40 @@ public class GlobalRankReader {
         if (!(mc.gui.screen() instanceof AbstractContainerScreen<?> scr)) return;
         String title = scr.getTitle().getString().toLowerCase(Locale.ROOT);
         if (!(title.contains("collection") || title.contains("leaderboard") || title.contains("mining"))) return;
+
+        // Формат Hypixel: подсказка «Mining Collections» в меню Collections —
+        // "Hard Stone: 176,264,902 (Top 0.006%)". Данные есть в предмете, наводить не обязательно.
+        for (Slot slot : scr.getMenu().slots) {
+            ItemStack st = slot.getItem();
+            if (st.isEmpty()) continue;
+            ItemLore lore = st.get(DataComponents.LORE);
+            if (lore == null) continue;
+            for (Component line : lore.lines()) {
+                String t = line.getString().replaceAll("§.", "").trim();
+                Matcher m = MENU_LINE.matcher(t);
+                if (!m.find()) continue;
+                Long amount = parseLong(m.group(1));
+                String top = m.group(2);
+                boolean changed = false;
+                if (amount != null && amount != data.menuCollection) { data.menuCollection = amount; changed = true; }
+                String text;
+                if (top != null) {
+                    try {
+                        double pct = Double.parseDouble(top.replace(",", "."));
+                        if (pct != data.globalTopPercent) { data.globalTopPercent = pct; changed = true; }
+                    } catch (NumberFormatException ignored) { }
+                    text = "топ " + top + "%";
+                } else {
+                    text = "нет в рейтинге (нужно 25k)";
+                }
+                if (!text.equals(data.globalRankText)) { data.globalRankText = text; changed = true; }
+                data.globalRank = 0;
+                data.globalRankAt = now;
+                if (changed) data.save();
+                saveDump("[" + scr.getTitle().getString() + "] " + t + "\n");
+                return;
+            }
+        }
 
         for (Slot slot : scr.getMenu().slots) {
             ItemStack st = slot.getItem();

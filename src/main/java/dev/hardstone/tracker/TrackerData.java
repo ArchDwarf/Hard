@@ -40,6 +40,8 @@ public class TrackerData {
     public String profileName = "";
     /** Строка о рейтинге из подсказки Hard Stone как есть (если нет номера места) */
     public String globalRankText = "";
+    /** Коллекция Hard Stone из меню Collections (в игре) */
+    public long menuCollection = 0;
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
     public String hypixelApiKey = "";

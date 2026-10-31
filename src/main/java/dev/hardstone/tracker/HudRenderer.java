@@ -80,8 +80,8 @@ public class HudRenderer {
                 + "  Всего: " + Fmt.compact(data.allTimeBlocks), GRAY));
 
         {
-            lines.add(new Line("Глобальное место: " + (globalRank.known() ? globalRank.describe()
-                    : "открой Collections (Collection rankings)"), globalRank.known() ? GOLD : GRAY));
+            lines.add(new Line("Глобальный рейтинг: " + (globalRank.known() ? globalRank.describe()
+                    : "открой меню Collections"), globalRank.known() ? GOLD : GRAY));
             if (globalRank.known()) {
                 long tu = globalRank.secondsUntilUpdate();
                 lines.add(new Line(tu > 0 ? "Обновление топа через " + Fmt.hms(tu)
