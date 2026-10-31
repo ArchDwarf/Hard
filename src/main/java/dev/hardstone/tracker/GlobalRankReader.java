@@ -48,9 +48,16 @@ public class GlobalRankReader {
             Long rank = null;
             Double pct = null;
             Long updateIn = null;
+            String rankText = null;
+            StringBuilder dump = new StringBuilder("[" + scr.getTitle().getString() + "] " + name + "\n");
             for (Component line : lore.lines()) {
                 String t = line.getString().replaceAll("§.", "");
                 String low = t.toLowerCase(Locale.ROOT);
+                dump.append(t).append('\n');
+                if (rankText == null && (low.contains("leaderboard") || low.contains("rank") || low.contains("position")
+                        || low.contains("place") || low.matches(".*top\\s*[\\d.,]+\\s*%.*") || low.trim().startsWith("#"))) {
+                    rankText = t.trim();
+                }
                 if (rank == null && (low.contains("leaderboard") || low.contains("position")
                         || low.contains("rank") || low.contains("place") || low.trim().startsWith("#"))) {
                     Matcher m = RANK.matcher(t);
@@ -67,6 +74,15 @@ public class GlobalRankReader {
                 }
             }
             if (updateIn != null && updateIn > 0) data.globalNextUpdateAt = now + updateIn * 1000;
+            saveDump(dump.toString());
+            if (pct != null) data.globalTopPercent = pct;
+            if (rankText != null && !rankText.equals(data.globalRankText)) {
+                data.globalRankText = rankText;
+                data.globalRankAt = now;
+                data.save();
+            } else if (rankText != null) {
+                data.globalRankAt = now;
+            }
             if (rank != null && rank > 0) {
                 if (rank != data.globalRank || (pct != null && pct != data.globalTopPercent)) {
                     data.globalRank = rank;
@@ -120,10 +136,26 @@ public class GlobalRankReader {
         }
     }
 
-    public boolean known() { return data.globalRank > 0; }
+    public boolean known() {
+        return data.globalRank > 0 || (data.globalRankText != null && !data.globalRankText.isBlank());
+    }
+
+    private String lastDump = "";
+
+    /** Сохраняет подсказку Hard Stone в config/hardstonetracker-lore.txt (для настройки распознавания) */
+    private void saveDump(String text) {
+        if (text.equals(lastDump)) return;
+        lastDump = text;
+        try {
+            java.nio.file.Files.writeString(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir()
+                    .resolve("hardstonetracker-lore.txt"), text, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+    }
 
     public String describe() {
         if (!known()) return "неизвестно";
+        if (data.globalRank <= 0) return data.globalRankText;
         String s = "#" + Fmt.num(data.globalRank);
         if (data.globalTopPercent > 0) s += " (топ " + data.globalTopPercent + "%)";
         return s;

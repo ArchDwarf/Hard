@@ -38,6 +38,8 @@ public class TrackerData {
     public long globalNextUpdateAt = 0;
     /** Имя профиля SkyBlock (из сообщения "You are playing on profile: X") */
     public String profileName = "";
+    /** Строка о рейтинге из подсказки Hard Stone как есть (если нет номера места) */
+    public String globalRankText = "";
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
     public String hypixelApiKey = "";
