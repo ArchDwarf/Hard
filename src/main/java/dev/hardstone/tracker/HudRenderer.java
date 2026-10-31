@@ -55,15 +55,6 @@ public class HudRenderer {
             lines.add(new Line("Дроп (сакс): " + Fmt.num(mining.sessionSackItems)
                     + "  (" + Fmt.compact(mining.sackPerHour()) + "/ч)", AQUA));
         }
-        double dpb = stats.dropsPerBlock();
-        boolean noStats = !(stats.tabMf || stats.tabBf || stats.tabSpread) && data.statsFromMenuAt == 0
-                && data.miningFortune == 0 && data.blockFortune == 0;
-        if (noStats) lines.add(new Line("Удача: нет данных (/hs status)", RED));
-        else lines.add(new Line("Удача: " + Fmt.num(Math.round(stats.totalFortune()))
-                + String.format(java.util.Locale.ROOT, " (x%.2f/блок)", dpb)
-                + "  Spread: " + Fmt.num(Math.round(stats.miningSpread())), GRAY));
-        lines.add(new Line("Дроп (формула): " + Fmt.num(Math.round(mining.sessionBlocks * dpb))
-                + "  (" + Fmt.compact(mining.perHour() * dpb) + "/ч)", AQUA));
         if (collection.enabled()) {
             long gain = collection.gained();
             String v = collection.error() != null ? collection.error() : gain < 0 ? "загрузка..." : "+" + Fmt.num(gain);
@@ -71,8 +62,13 @@ public class HudRenderer {
             if (collection.total() >= 0) {
                 lines.add(new Line("Коллекция: " + Fmt.num(collection.total()), GOLD));
             }
-            lines.add(new Line("За сессию (API): " + v
-                    + (collection.isLoading() ? "  · обновляю..." : next >= 0 ? "  · обн. через " + Fmt.mmss(next) : ""), GREEN));
+            lines.add(new Line("За сессию: " + v, GREEN));
+            double ph = collection.perHour();
+            lines.add(new Line("В час: " + (ph < 0 ? "считаю... (нужно 2 обновления API)"
+                    : Fmt.num(Math.round(ph)) + "/ч" + (collection.idle() ? " (нет прироста 10+ мин)" : "")),
+                    collection.idle() ? GRAY : YELLOW));
+            lines.add(new Line(collection.isLoading() ? "API: обновляю..."
+                    : next >= 0 ? "API: обновление через " + Fmt.mmss(next) : "API: загрузка...", GRAY));
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
                 mining.isPaused() ? RED : WHITE));

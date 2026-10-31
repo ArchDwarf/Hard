@@ -76,27 +76,8 @@ public class StartupCheck {
                     + (collection.total() >= 0 ? Fmt.num(collection.total()) : "загрузка...")).withStyle(ChatFormatting.GREEN));
         }
 
-        // 2. Статы (удача / Spread)
-        boolean fromTab = stats.tabMf || stats.tabBf || stats.tabSpread;
-        if (!fromTab && data.statsFromMenuAt == 0 && data.miningFortune == 0 && data.blockFortune == 0) {
-            ok = false;
-            line(mc, Component.literal("✘ Не вижу удачу/Spread. Один раз включи в таб-листе виджет ").withStyle(ChatFormatting.RED)
-                    .append(Component.literal("Stats").withStyle(ChatFormatting.YELLOW))
-                    .append(Component.literal(" со строками Mining Fortune, Block Fortune, Mining Spread ").withStyle(ChatFormatting.RED))
-                    .append(Component.literal("(SkyBlock Menu → Settings → Tab Widgets)").withStyle(ChatFormatting.GRAY))
-                    .append(Component.literal(" — или просто открой SkyBlock Menu → Your SkyBlock Profile.").withStyle(ChatFormatting.GRAY)));
-        } else if (!fromTab && verbose) {
-            line(mc, Component.literal("● Статы из " + stats.source() + " (не обновляются в реальном времени — включи виджет Stats в табе)")
-                    .withStyle(ChatFormatting.YELLOW));
-        } else if (verbose) {
-            line(mc, Component.literal("✔ Статы в реальном времени из таба: удача " + Fmt.num(Math.round(stats.totalFortune()))
-                    + ", Spread " + Fmt.num(Math.round(stats.miningSpread()))).withStyle(ChatFormatting.GREEN));
-        }
-
         if (ok) {
-            line(mc, Component.literal("✔ Hard Stone Tracker: всё работает автоматически. ").withStyle(ChatFormatting.GREEN)
-                    .append(Component.literal("Удача " + Fmt.num(Math.round(stats.totalFortune()))
-                            + ", Spread " + Fmt.num(Math.round(stats.miningSpread()))).withStyle(ChatFormatting.GRAY)));
+            line(mc, Component.literal("✔ Hard Stone Tracker: всё работает автоматически.").withStyle(ChatFormatting.GREEN));
         }
     }
 

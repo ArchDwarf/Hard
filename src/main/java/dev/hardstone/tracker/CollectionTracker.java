@@ -17,6 +17,10 @@ public class CollectionTracker {
     private volatile long lastChangeMs = 0;
     private volatile String error = null;
     private volatile boolean running = false;
+    /** Точки (время, значение) в моменты, когда коллекция в API изменилась */
+    private final java.util.ArrayDeque<long[]> samples = new java.util.ArrayDeque<>();
+    private static final long RATE_WINDOW_MS = 60 * 60_000;
+    private static final long IDLE_MS = 10 * 60_000;
 
     public CollectionTracker(TrackerData data, LeaderboardService api) {
         this.data = data;
@@ -29,6 +33,34 @@ public class CollectionTracker {
     }
 
     public long total() { return latest; }
+
+    /**
+     * Скорость по данным API: прирост коллекции за последний час (или с начала сессии, если меньше часа),
+     * пересчитывается при каждом обновлении API. -1 — пока мало данных.
+     */
+    public synchronized double perHour() {
+        if (samples.size() < 2) return -1;
+        long[] last = samples.peekLast();
+        long[] first = samples.peekFirst();
+        for (long[] s : samples) {
+            if (last[0] - s[0] <= RATE_WINDOW_MS) { first = s; break; }
+        }
+        if (first == last) {
+            // в окне один замер — берём предыдущий
+            long[] prev = null;
+            for (long[] s : samples) { if (s == last) break; prev = s; }
+            if (prev == null) return -1;
+            first = prev;
+        }
+        double hours = (last[0] - first[0]) / 3_600_000.0;
+        if (hours <= 0) return -1;
+        return (last[1] - first[1]) / hours;
+    }
+
+    /** true — давно (10+ мин) нет прироста в API: добыча, видимо, остановлена */
+    public boolean idle() {
+        return lastChangeMs > 0 && System.currentTimeMillis() - lastChangeMs > IDLE_MS;
+    }
     public boolean isLoading() { return running; }
 
     /** Секунд до следующего запроса к API, -1 если ещё не запрашивали */
@@ -60,7 +92,14 @@ public class CollectionTracker {
         Thread t = new Thread(() -> {
             try {
                 long v = api.fetchCollection(selfName);
-                if (v != latest) lastChangeMs = System.currentTimeMillis();
+                long now = System.currentTimeMillis();
+                if (v != latest) {
+                    lastChangeMs = now;
+                    synchronized (this) {
+                        samples.addLast(new long[]{now, v});
+                        while (samples.size() > 200) samples.pollFirst();
+                    }
+                }
                 latest = v;
                 if (baseline < 0) baseline = v;
                 error = null;
@@ -77,7 +116,9 @@ public class CollectionTracker {
     }
 
     /** Новая сессия: текущее значение становится точкой отсчёта */
-    public void resetSession() {
+    public synchronized void resetSession() {
         baseline = latest;
+        samples.clear();
+        if (latest >= 0) samples.addLast(new long[]{System.currentTimeMillis(), latest});
     }
 }
