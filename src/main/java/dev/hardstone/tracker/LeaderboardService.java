@@ -194,6 +194,11 @@ public class LeaderboardService {
 
     // ------------------------------------------------------------ игроки
 
+    /** Коллекция HARD_STONE игрока (блокирующий вызов, звать из фонового потока) */
+    public long fetchCollection(String name) throws Exception {
+        return fetchHardStone(resolveUuid(name));
+    }
+
     private String resolveUuid(String name) throws Exception {
         String key = name.toLowerCase(Locale.ROOT);
         String cached = uuidByName.get(key);
@@ -266,7 +271,7 @@ public class LeaderboardService {
         return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsString() : "";
     }
 
-    private static class ApiException extends Exception {
+    static class ApiException extends Exception {
         final boolean fatal;
         ApiException(String msg, boolean fatal) { super(msg); this.fatal = fatal; }
     }

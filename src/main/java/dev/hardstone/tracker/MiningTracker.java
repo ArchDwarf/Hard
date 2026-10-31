@@ -1,42 +1,71 @@
 package dev.hardstone.tracker;
 
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Считает добытый Hard Stone двумя способами:
- * 1) Блоки: Hard Stone в шахтах Hypixel — это обычный minecraft:stone. Запоминаем камень, по которому игрок бьёт,
- *    и засчитываем его, когда сервер заменяет его другим блоком (воздух / бедрок при регенерации).
- * 2) Предметы: сообщение "[Sacks] +N items." содержит в подсказке строки "+123 Hard Stone (Mining Sack)" —
- *    это реальный дроп с учётом Mining Fortune.
+ * Считает добытый Hard Stone (в шахтах Hypixel это обычный minecraft:stone).
+ *
+ * <p>Блоки. Каждый тик сканируется куб радиусом {@link #R} вокруг игрока и запоминаются все блоки камня.
+ * Если камень исчез, он засчитывается, когда это связано с твоей добычей:
+ * <ul>
+ *   <li>блок находится рядом с тем, по которому ты бьёшь (или к которому применил способность ПКМ),</li>
+ *   <li>или вплотную к блоку, засчитанному только что (цепочки Mining Spread / Pickobulus).</li>
+ * </ul>
+ * Так учитываются все блоки, сломанные за один удар: Mining Spread (шанс сломать соседние),
+ * способности вроде Pickobulus и т.п. Блоки, которые ломают другие игроки в стороне, не засчитываются.
+ *
+ * <p>Дроп. Сообщение "[Sacks] +N items." содержит в подсказке "+123 Hard Stone" — реальный дроп
+ * с учётом Mining Fortune.
  */
 public class MiningTracker {
     private static final Pattern SACK_LINE = Pattern.compile("\\+([\\d,]+) Hard Stone\\b");
-    private static final long WATCH_MS = 2500;
+
+    /** Радиус сканирования вокруг игрока */
+    private static final int R = 6;
+    /** Сколько после удара/ПКМ считаем, что игрок копает */
+    private static final long ACTIVE_MS = 1500;
+    /** Макс. расстояние (в квадрате) от блока под прицелом до засчитываемого блока */
+    private static final int NEAR_TARGET_SQ = 5 * 5;
+    /** Макс. расстояние (в квадрате) до недавно засчитанного блока для цепочек Spread */
+    private static final int CHAIN_SQ = 3;
+    private static final long CHAIN_MS = 2000;
 
     private final TrackerData data;
     private final LocationTracker location;
-    private final Map<BlockPos, Long> watched = new HashMap<>();
+
+    private LongOpenHashSet prevStone = new LongOpenHashSet(4096);
+    private LongOpenHashSet curStone = new LongOpenHashSet(4096);
+    private final Long2LongOpenHashMap recentMined = new Long2LongOpenHashMap();
+    private int prevCx, prevCy, prevCz;
+    private boolean havePrev = false;
+
+    private BlockPos lastTarget;
+    private long lastTargetMs = 0;
+    private long lastActionMs = 0;
 
     // ---- текущая сессия ----
     public long sessionBlocks = 0;
     public long sessionSackItems = 0;
     public long sessionActiveMs = 0;
+    /** Сколько блоков сломано последним ударом (для HUD) */
+    public int lastBurst = 0;
+    private long lastBurstMs = 0;
     private long lastMinedMs = 0;
     private long lastTickMs = 0;
-    private Object lastLevel;
+    private Level lastLevel;
     private long dirtySinceMs = -1;
 
     public MiningTracker(TrackerData data, LocationTracker location) {
@@ -66,52 +95,105 @@ public class MiningTracker {
         lastTickMs = now;
 
         if (mc.level != lastLevel) {
-            // При смене мира блоки «исчезают» — не считаем это добычей
+            // Смена мира: блоки «исчезают» при загрузке — не считаем это добычей
             lastLevel = mc.level;
-            watched.clear();
+            havePrev = false;
+            recentMined.clear();
         }
-        if (mc.level == null || mc.player == null) return;
+        if (mc.level == null || mc.player == null) {
+            havePrev = false;
+            return;
+        }
 
         if (!isPaused()) {
             sessionActiveMs += dt;
             data.allTimeActiveMs += dt;
         }
 
-        if (isCountingHere()) {
-            // 1. Запоминаем камень под прицелом, пока зажата атака
-            if (mc.options.keyAttack.isDown() && mc.hitResult instanceof BlockHitResult bhr
-                    && bhr.getType() == HitResult.Type.BLOCK) {
-                BlockPos pos = bhr.getBlockPos().immutable();
-                if (mc.level.getBlockState(pos).is(Blocks.STONE)) watched.put(pos, now);
+        if (!isCountingHere()) {
+            havePrev = false;
+            saveIfNeeded(now);
+            return;
+        }
+
+        // 1. Что делает игрок: ЛКМ (копание) или ПКМ (способность вроде Pickobulus) по блоку
+        boolean attack = mc.options.keyAttack.isDown();
+        boolean use = mc.options.keyUse.isDown();
+        if (attack || use) {
+            lastActionMs = now;
+            if (mc.hitResult instanceof BlockHitResult bhr && bhr.getType() == HitResult.Type.BLOCK) {
+                lastTarget = bhr.getBlockPos().immutable();
+                lastTargetMs = now;
             }
-            // 2. Проверяем, не исчез ли запомненный камень
-            Vec3 eye = mc.player.getEyePosition();
-            Iterator<Map.Entry<BlockPos, Long>> it = watched.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<BlockPos, Long> e = it.next();
-                BlockPos pos = e.getKey();
-                if (!mc.level.getBlockState(pos).is(Blocks.STONE)) {
-                    if (eye.distanceToSqr(Vec3.atCenterOf(pos)) < 10 * 10) onBlockMined(now);
-                    it.remove();
-                } else if (now - e.getValue() > WATCH_MS) {
-                    it.remove();
+        }
+
+        // 2. Сканируем камень вокруг игрока
+        BlockPos center = mc.player.blockPosition();
+        int cx = center.getX(), cy = center.getY(), cz = center.getZ();
+        curStone.clear();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int x = cx - R; x <= cx + R; x++) {
+            for (int y = cy - R; y <= cy + R; y++) {
+                for (int z = cz - R; z <= cz + R; z++) {
+                    m.set(x, y, z);
+                    if (mc.level.getBlockState(m).is(Blocks.STONE)) curStone.add(m.asLong());
                 }
             }
-        } else {
-            watched.clear();
         }
 
-        if (dirtySinceMs > 0 && now - dirtySinceMs > 30_000) {
-            data.save();
-            dirtySinceMs = -1;
+        // 3. Ищем исчезнувший камень (только если игрок не телепортировался)
+        boolean teleported = Math.abs(cx - prevCx) > 4 || Math.abs(cy - prevCy) > 4 || Math.abs(cz - prevCz) > 4;
+        if (havePrev && !teleported && now - lastActionMs < ACTIVE_MS) {
+            int mined = 0;
+            LongIterator it = prevStone.iterator();
+            while (it.hasNext()) {
+                long l = it.nextLong();
+                if (curStone.contains(l)) continue;
+                int x = BlockPos.getX(l), y = BlockPos.getY(l), z = BlockPos.getZ(l);
+                // блок мог просто выйти из зоны сканирования
+                if (Math.abs(x - cx) > R || Math.abs(y - cy) > R || Math.abs(z - cz) > R) continue;
+                if (isRelatedToPlayer(x, y, z, now)) {
+                    recentMined.put(l, now);
+                    mined++;
+                }
+            }
+            if (mined > 0) onBlocksMined(mined, now);
         }
+
+        // чистим старые записи цепочек
+        if (!recentMined.isEmpty()) recentMined.long2LongEntrySet().removeIf(e -> now - e.getLongValue() > CHAIN_MS);
+
+        LongOpenHashSet t = prevStone;
+        prevStone = curStone;
+        curStone = t;
+        prevCx = cx; prevCy = cy; prevCz = cz;
+        havePrev = true;
+
+        if (now - lastBurstMs > 3000) lastBurst = 0;
+        saveIfNeeded(now);
     }
 
-    private void onBlockMined(long now) {
+    private boolean isRelatedToPlayer(int x, int y, int z, long now) {
+        if (lastTarget != null && now - lastTargetMs < ACTIVE_MS) {
+            int dx = x - lastTarget.getX(), dy = y - lastTarget.getY(), dz = z - lastTarget.getZ();
+            if (dx * dx + dy * dy + dz * dz <= NEAR_TARGET_SQ) return true;
+        }
+        // цепочка: рядом с только что засчитанным блоком
+        for (var e : recentMined.long2LongEntrySet()) {
+            long p = e.getLongKey();
+            int dx = x - BlockPos.getX(p), dy = y - BlockPos.getY(p), dz = z - BlockPos.getZ(p);
+            if (dx * dx + dy * dy + dz * dz <= CHAIN_SQ) return true;
+        }
+        return false;
+    }
+
+    private void onBlocksMined(int count, long now) {
         if (isPaused()) lastTickMs = now; // выходим из паузы без «прыжка» таймера
         lastMinedMs = now;
-        sessionBlocks++;
-        data.allTimeBlocks++;
+        sessionBlocks += count;
+        data.allTimeBlocks += count;
+        lastBurst = (now - lastBurstMs < 300) ? lastBurst + count : count;
+        lastBurstMs = now;
         if (sessionActiveMs > 5 * 60_000 && perHour() > data.bestBlocksPerHour) data.bestBlocksPerHour = perHour();
         markDirty();
     }
@@ -122,11 +204,11 @@ public class MiningTracker {
         if (!plain.startsWith("[Sacks] +")) return;
         String hover = findHoverText(message);
         if (hover == null) return;
-        Matcher m = SACK_LINE.matcher(hover.replaceAll("§.", ""));
+        Matcher mt = SACK_LINE.matcher(hover.replaceAll("§.", ""));
         long added = 0;
-        while (m.find()) {
+        while (mt.find()) {
             try {
-                added += Long.parseLong(m.group(1).replace(",", ""));
+                added += Long.parseLong(mt.group(1).replace(",", ""));
             } catch (NumberFormatException ignored) {
             }
         }
@@ -163,12 +245,21 @@ public class MiningTracker {
         sessionSackItems = 0;
         sessionActiveMs = 0;
         lastMinedMs = 0;
-        watched.clear();
+        lastBurst = 0;
+        recentMined.clear();
+        havePrev = false;
         data.save();
         dirtySinceMs = -1;
     }
 
     private void markDirty() {
         if (dirtySinceMs < 0) dirtySinceMs = System.currentTimeMillis();
+    }
+
+    private void saveIfNeeded(long now) {
+        if (dirtySinceMs > 0 && now - dirtySinceMs > 30_000) {
+            data.save();
+            dirtySinceMs = -1;
+        }
     }
 }

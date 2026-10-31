@@ -24,12 +24,15 @@ public class HudRenderer {
     private final MiningTracker mining;
     private final LocationTracker location;
     private final LeaderboardService leaderboard;
+    private final CollectionTracker collection;
 
-    public HudRenderer(TrackerData data, MiningTracker mining, LocationTracker location, LeaderboardService leaderboard) {
+    public HudRenderer(TrackerData data, MiningTracker mining, LocationTracker location, LeaderboardService leaderboard,
+                       CollectionTracker collection) {
         this.data = data;
         this.mining = mining;
         this.location = location;
         this.leaderboard = leaderboard;
+        this.collection = collection;
     }
 
     public void extract(GuiGraphicsExtractor g, DeltaTracker delta) {
@@ -43,11 +46,17 @@ public class HudRenderer {
         boolean counting = mining.isCountingHere();
         lines.add(new Line("Локация: " + (data.countEverywhere ? "везде" : location.prettyLocation()),
                 counting ? GREEN : GRAY));
-        lines.add(new Line("Блоков: " + Fmt.num(mining.sessionBlocks), WHITE));
+        lines.add(new Line("Блоков: " + Fmt.num(mining.sessionBlocks)
+                + (mining.lastBurst > 1 ? "  (+" + mining.lastBurst + " за удар)" : ""), WHITE));
         lines.add(new Line("Блоков/ч: " + Fmt.compact(mining.perHour()), YELLOW));
         if (mining.sessionSackItems > 0) {
             lines.add(new Line("Дроп (сакс): " + Fmt.num(mining.sessionSackItems)
                     + "  (" + Fmt.compact(mining.sackPerHour()) + "/ч)", AQUA));
+        }
+        if (collection.enabled()) {
+            long g = collection.gained();
+            String v = collection.error() != null ? collection.error() : g < 0 ? "загрузка..." : "+" + Fmt.num(g);
+            lines.add(new Line("Коллекция (API): " + v, GREEN));
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
                 mining.isPaused() ? RED : WHITE));

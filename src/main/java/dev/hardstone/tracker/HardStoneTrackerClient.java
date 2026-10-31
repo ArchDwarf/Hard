@@ -37,6 +37,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     private LocationTracker location;
     private MiningTracker mining;
     private LeaderboardService leaderboard;
+    private CollectionTracker collection;
 
     @Override
     public void onInitializeClient() {
@@ -44,12 +45,14 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         location = new LocationTracker();
         mining = new MiningTracker(data, location);
         leaderboard = new LeaderboardService(data);
-        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard);
+        collection = new CollectionTracker(data, leaderboard);
+        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection);
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             location.tick(mc);
             mining.tick(mc);
             if (mc.player != null && location.isOnHypixel()) leaderboard.autoRefresh(mc.getUser().getName());
+            if (mc.player != null) collection.tick(mc.getUser().getName(), location.isOnHypixel());
         });
 
         ClientReceiveMessageEvents.ALLOW_GAME.register((message, overlay) -> {
@@ -58,7 +61,10 @@ public class HardStoneTrackerClient implements ClientModInitializer {
             return location.onChat(message.getString());
         });
 
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, mc) -> mining.endSession());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, mc) -> {
+            mining.endSession();
+            collection.resetSession();
+        });
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> mining.endSession());
 
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT,
@@ -77,6 +83,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 .then(literal("stats").executes(this::cmdStats))
                 .then(literal("reset").executes(c -> {
                     mining.endSession();
+                    collection.resetSession();
                     ok(c, "Сессия сохранена в историю и сброшена.");
                     return 1;
                 }))
@@ -119,6 +126,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                     data.hypixelApiKey = StringArgumentType.getString(c, "key").trim();
                     data.save();
                     ok(c, "API-ключ сохранён. Обновляю топ...");
+                    collection.forceRefresh(Minecraft.getInstance().getUser().getName());
                     refreshTop(c.getSource());
                     return 1;
                 })))
@@ -192,6 +200,10 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         send(s, kv("Блоков добыто", Fmt.num(mining.sessionBlocks)));
         send(s, kv("Блоков в час", Fmt.num(Math.round(mining.perHour()))));
         send(s, kv("Дроп в сакс", Fmt.num(mining.sessionSackItems) + " (" + Fmt.num(Math.round(mining.sackPerHour())) + "/ч)"));
+        long g = collection.gained();
+        send(s, kv("По коллекции API", !collection.enabled() ? "нужен /hs apikey"
+                : collection.error() != null ? collection.error()
+                : g < 0 ? "загрузка..." : "+" + Fmt.num(g) + " (всего " + Fmt.num(collection.total()) + ")"));
         send(s, kv("Активное время", Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : "")));
         send(s, header("За всё время"));
         send(s, kv("Блоков", Fmt.num(data.allTimeBlocks)));
