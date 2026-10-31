@@ -102,7 +102,7 @@ public class StartupCheck {
 
     private static void line(Minecraft mc, Component c) {
         if (mc.player == null) return;
-        mc.player.displayClientMessage(Component.literal("[HS] ").withStyle(ChatFormatting.GOLD).append(c), false);
+        mc.player.sendSystemMessage(Component.literal("[HS] ").withStyle(ChatFormatting.GOLD).append(c));
     }
 
     private static MutableComponent link(String text, String url) {
