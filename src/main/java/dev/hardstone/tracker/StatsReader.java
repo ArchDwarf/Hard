@@ -68,7 +68,7 @@ public class StatsReader {
 
     /** Меню профиля SkyBlock: читаем итоговые статы из описаний предметов */
     private void readProfileMenu(Minecraft mc) {
-        if (!(mc.screen instanceof AbstractContainerScreen<?> scr)) return;
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen<?> scr)) return;
         String title = scr.getTitle().getString();
         if (!(title.contains("Profile") || title.contains("Stats"))) return;
         Double mf = null, bf = null, sp = null;
