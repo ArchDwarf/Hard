@@ -68,7 +68,10 @@ public class HudRenderer {
             long gain = collection.gained();
             String v = collection.error() != null ? collection.error() : gain < 0 ? "загрузка..." : "+" + Fmt.num(gain);
             long next = collection.secondsUntilNext();
-            lines.add(new Line("Коллекция (API): " + v
+            if (collection.total() >= 0) {
+                lines.add(new Line("Коллекция: " + Fmt.num(collection.total()), GOLD));
+            }
+            lines.add(new Line("За сессию (API): " + v
                     + (collection.isLoading() ? "  · обновляю..." : next >= 0 ? "  · обн. через " + Fmt.mmss(next) : ""), GREEN));
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
@@ -78,7 +81,7 @@ public class HudRenderer {
 
         if (data.hudShowTop) {
             lines.add(new Line("Глобальное место: " + (globalRank.known() ? globalRank.describe()
-                    : "открой Collections → Leaderboards"), globalRank.known() ? GOLD : GRAY));
+                    : "/hs top — ссылка на Elite Skyblock"), globalRank.known() ? GOLD : GRAY));
             if (globalRank.known()) {
                 long tu = globalRank.secondsUntilUpdate();
                 lines.add(new Line(tu > 0 ? "Обновление топа через " + Fmt.hms(tu)

@@ -17,7 +17,9 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -67,6 +69,15 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         ClientReceiveMessageEvents.ALLOW_GAME.register((message, overlay) -> {
             if (overlay) return true;
             mining.onChat(message);
+            String plain = message.getString().replaceAll("§.", "");
+            int pi = plain.indexOf("You are playing on profile: ");
+            if (pi >= 0) {
+                String prof = plain.substring(pi + 28).trim().split("\\s+")[0];
+                if (!prof.isEmpty() && !prof.equals(data.profileName)) {
+                    data.profileName = prof;
+                    data.save();
+                }
+            }
             return location.onChat(message.getString());
         });
 
@@ -307,25 +318,25 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     }
 
     private int cmdTop(CommandContext<FabricClientCommandSource> c) {
-        FabricClientCommandSource s = c.getSource();
-        List<LeaderboardService.Entry> top = leaderboard.top();
-        if (top.isEmpty()) {
-            printTop(s);
-            if (data.hypixelApiKey.isBlank()) {
-                send(s, Component.literal("Для топа нужен Hypixel API-ключ: developer.hypixel.net → /hs apikey <ключ>")
-                        .withStyle(ChatFormatting.RED));
-            } else {
-                refreshTop(s);
-            }
-            return 1;
-        }
-        printTop(s);
+        printTop(c.getSource());
         return 1;
     }
 
     private void printTop(FabricClientCommandSource s) {
         send(s, header("Глобальный топ Hypixel (все игроки)"));
         send(s, kv("Твоё место по Hard Stone", globalRank.describe()));
+        if (collection.total() >= 0) send(s, kv("Коллекция Hard Stone", Fmt.num(collection.total())));
+        String url = eliteUrl();
+        send(s, Component.literal("Глобальный топ и твой ранг: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal("[Elite Skyblock — ранги]").withStyle(st -> st.withColor(ChatFormatting.AQUA)
+                        .withUnderlined(true)
+                        .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal(url)))))
+                .append(Component.literal(" ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("[топ Hard Stone]").withStyle(st -> st.withColor(ChatFormatting.AQUA)
+                        .withUnderlined(true)
+                        .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create("https://eliteskyblock.com/leaderboard/hard-stone")))
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("https://eliteskyblock.com/leaderboard/hard-stone"))))));
         if (!globalRank.known()) {
             send(s, Component.literal("Открой SkyBlock Menu → Collections → картина вверху (Leaderboards) — мод запомнит место. "
                     + "Список других игроков Hypixel не публикует ни в игре, ни в API.").withStyle(ChatFormatting.GRAY));
@@ -348,6 +359,12 @@ public class HardStoneTrackerClient implements ClientModInitializer {
             send(s, line);
             i++;
         }
+    }
+
+    private String eliteUrl() {
+        String name = Minecraft.getInstance().getUser().getName();
+        String prof = data.profileName == null || data.profileName.isBlank() ? "" : "/" + data.profileName;
+        return "https://eliteskyblock.com/@" + name + prof + "/ranks";
     }
 
     private int cmdBoards(CommandContext<FabricClientCommandSource> c) {

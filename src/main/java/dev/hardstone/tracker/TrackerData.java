@@ -36,6 +36,8 @@ public class TrackerData {
     public long globalRankAt = 0;
     /** Когда Hypixel обновит лидерборд (если указано в меню), 0 = неизвестно */
     public long globalNextUpdateAt = 0;
+    /** Имя профиля SkyBlock (из сообщения "You are playing on profile: X") */
+    public String profileName = "";
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
     public String hypixelApiKey = "";
