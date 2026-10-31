@@ -26,15 +26,18 @@ public class HudRenderer {
     private final LeaderboardService leaderboard;
     private final CollectionTracker collection;
     private final StatsReader stats;
+    private final GlobalRankReader globalRank;
 
     public HudRenderer(TrackerData data, MiningTracker mining, LocationTracker location, LeaderboardService leaderboard,
-                       CollectionTracker collection, StatsReader stats) {
+                       CollectionTracker collection, StatsReader stats,
+                       GlobalRankReader globalRank) {
         this.data = data;
         this.mining = mining;
         this.location = location;
         this.leaderboard = leaderboard;
         this.collection = collection;
         this.stats = stats;
+        this.globalRank = globalRank;
     }
 
     public void extract(GuiGraphicsExtractor g, DeltaTracker delta) {
@@ -74,8 +77,12 @@ public class HudRenderer {
         lines.add(new Line("Рекорд/ч: " + Fmt.compact(data.bestBlocksPerHour)
                 + "  Всего: " + Fmt.compact(data.allTimeBlocks), GRAY));
 
+        if (data.hudShowTop) {
+            lines.add(new Line("Глобальное место: " + (globalRank.known() ? globalRank.describe()
+                    : "открой Collections → Leaderboards"), globalRank.known() ? GOLD : GRAY));
+        }
         if (data.hudShowTop && !leaderboard.top().isEmpty()) {
-            lines.add(new Line("Топ коллекции Hard Stone:", GOLD));
+            lines.add(new Line("Сравнение (личные коллекции):", GOLD));
             String self = mc.getUser().getName();
             int i = 1;
             for (LeaderboardService.Entry e : leaderboard.top()) {

@@ -41,6 +41,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     private CollectionTracker collection;
     private StatsReader stats;
     private StartupCheck startup;
+    private GlobalRankReader globalRank;
 
     @Override
     public void onInitializeClient() {
@@ -51,13 +52,15 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         collection = new CollectionTracker(data, leaderboard);
         stats = new StatsReader(data);
         startup = new StartupCheck(data, location, collection, stats);
-        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection, stats);
+        globalRank = new GlobalRankReader(data);
+        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection, stats, globalRank);
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             location.tick(mc);
             mining.tick(mc);
             stats.tick(mc);
             startup.tick(mc);
+            globalRank.tick(mc);
             if (mc.player != null && location.isOnHypixel()) leaderboard.autoRefresh(mc.getUser().getName());
             if (mc.player != null) collection.tick(mc.getUser().getName(), location.isOnHypixel());
         });
@@ -308,6 +311,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         FabricClientCommandSource s = c.getSource();
         List<LeaderboardService.Entry> top = leaderboard.top();
         if (top.isEmpty()) {
+            printTop(s);
             if (data.hypixelApiKey.isBlank()) {
                 send(s, Component.literal("Для топа нужен Hypixel API-ключ: developer.hypixel.net → /hs apikey <ключ>")
                         .withStyle(ChatFormatting.RED));
@@ -321,8 +325,15 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     }
 
     private void printTop(FabricClientCommandSource s) {
+        send(s, header("Глобальный топ Hypixel (все игроки)"));
+        send(s, kv("Твоё место по Hard Stone", globalRank.describe()));
+        if (!globalRank.known()) {
+            send(s, Component.literal("Открой SkyBlock Menu → Collections → картина вверху (Leaderboards) — мод запомнит место. "
+                    + "Список других игроков Hypixel не публикует ни в игре, ни в API.").withStyle(ChatFormatting.GRAY));
+        }
+        if (leaderboard.top().isEmpty()) return;
         long ago = (System.currentTimeMillis() - leaderboard.lastUpdateMs()) / 60_000;
-        send(s, header("Топ Hard Stone (обновлено " + ago + " мин назад)"));
+        send(s, header("Сравнение с игроками (личные коллекции, обновлено " + ago + " мин назад)"));
         send(s, Component.literal("Источник: " + leaderboard.source()).withStyle(ChatFormatting.DARK_GRAY));
         String self = Minecraft.getInstance().getUser().getName();
         int i = 1;

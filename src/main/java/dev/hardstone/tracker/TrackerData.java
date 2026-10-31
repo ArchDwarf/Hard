@@ -30,6 +30,10 @@ public class TrackerData {
     public double miningSpread = 0;
     /** Когда статы последний раз прочитаны из меню профиля (0 = никогда) */
     public long statsFromMenuAt = 0;
+    /** Глобальное место в официальном топе Hypixel по коллекции Hard Stone (0 = неизвестно) */
+    public long globalRank = 0;
+    public double globalTopPercent = 0;
+    public long globalRankAt = 0;
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
     public String hypixelApiKey = "";
