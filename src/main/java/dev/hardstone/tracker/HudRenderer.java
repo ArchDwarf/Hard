@@ -56,7 +56,10 @@ public class HudRenderer {
                     + "  (" + Fmt.compact(mining.sackPerHour()) + "/ч)", AQUA));
         }
         double dpb = stats.dropsPerBlock();
-        lines.add(new Line("Удача: " + Fmt.num(Math.round(stats.totalFortune()))
+        boolean noStats = !(stats.tabMf || stats.tabBf || stats.tabSpread) && data.statsFromMenuAt == 0
+                && data.miningFortune == 0 && data.blockFortune == 0;
+        if (noStats) lines.add(new Line("Удача: нет данных (/hs status)", RED));
+        else lines.add(new Line("Удача: " + Fmt.num(Math.round(stats.totalFortune()))
                 + String.format(java.util.Locale.ROOT, " (x%.2f/блок)", dpb)
                 + "  Spread: " + Fmt.num(Math.round(stats.miningSpread())), GRAY));
         lines.add(new Line("Дроп (формула): " + Fmt.num(Math.round(mining.sessionBlocks * dpb))

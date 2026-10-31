@@ -40,6 +40,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     private LeaderboardService leaderboard;
     private CollectionTracker collection;
     private StatsReader stats;
+    private StartupCheck startup;
 
     @Override
     public void onInitializeClient() {
@@ -49,12 +50,14 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         leaderboard = new LeaderboardService(data);
         collection = new CollectionTracker(data, leaderboard);
         stats = new StatsReader(data);
+        startup = new StartupCheck(data, location, collection, stats);
         HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection, stats);
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             location.tick(mc);
             mining.tick(mc);
             stats.tick(mc);
+            startup.tick(mc);
             if (mc.player != null && location.isOnHypixel()) leaderboard.autoRefresh(mc.getUser().getName());
             if (mc.player != null) collection.tick(mc.getUser().getName(), location.isOnHypixel());
         });
@@ -68,6 +71,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, mc) -> {
             mining.endSession();
             collection.resetSession();
+            startup.reset();
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> mining.endSession());
 
@@ -93,6 +97,10 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 }))
                 .then(literal("sessions").executes(this::cmdSessions))
                 .then(literal("formula").executes(this::cmdFormula))
+                .then(literal("status").executes(c -> {
+                    startup.report(Minecraft.getInstance(), true);
+                    return 1;
+                }))
                 .then(literal("fortune").then(argument("mining", DoubleArgumentType.doubleArg(0, 100000))
                         .executes(c -> setFortune(c, DoubleArgumentType.getDouble(c, "mining"), data.blockFortune))
                         .then(argument("block", DoubleArgumentType.doubleArg(0, 100000))
@@ -196,6 +204,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 {"/hs", "статистика сессии"},
                 {"/hs reset", "сохранить и начать новую сессию"},
                 {"/hs sessions", "топ твоих лучших сессий"},
+                {"/hs status", "проверка: ключ, API, статы"},
                 {"/hs formula", "удача/Spread и расчёт дропа по формуле"},
                 {"/hs fortune <MF> [BF]", "вручную: Mining + Block Fortune"},
                 {"/hs spread <число>", "вручную: Mining Spread"},
