@@ -44,6 +44,8 @@ public class HardStoneTrackerClient implements ClientModInitializer {
     private StatsReader stats;
     private StartupCheck startup;
     private GlobalRankReader globalRank;
+    private HudRenderer hud;
+    private boolean openEditor = false;
 
     @Override
     public void onInitializeClient() {
@@ -55,7 +57,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         stats = new StatsReader(data);
         startup = new StartupCheck(data, location, collection, stats);
         globalRank = new GlobalRankReader(data);
-        HudRenderer hud = new HudRenderer(data, mining, location, leaderboard, collection, stats, globalRank);
+        hud = new HudRenderer(data, mining, location, leaderboard, collection, stats, globalRank);
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             location.tick(mc);
@@ -63,6 +65,10 @@ public class HardStoneTrackerClient implements ClientModInitializer {
             stats.tick(mc);
             startup.tick(mc);
             globalRank.tick(mc);
+            if (openEditor && mc.gui.screen() == null) {
+                openEditor = false;
+                mc.gui.setScreen(new HudEditScreen(data, hud));
+            }
             if (mc.player != null) collection.tick(mc.getUser().getName(), location.isOnHypixel());
         });
 
@@ -110,6 +116,10 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 }))
                 .then(literal("sessions").executes(this::cmdSessions))
                 .then(literal("formula").executes(this::cmdFormula))
+                .then(literal("edit").executes(c -> {
+                    openEditor = true;
+                    return 1;
+                }))
                 .then(literal("status").executes(c -> {
                     startup.report(Minecraft.getInstance(), true);
                     return 1;
@@ -217,6 +227,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 {"/hs", "статистика сессии"},
                 {"/hs reset", "сохранить и начать новую сессию"},
                 {"/hs sessions", "топ твоих лучших сессий"},
+                {"/hs edit", "редактор HUD: двигать, скрыть/добавить строки"},
                 {"/hs status", "проверка: ключ, API, статы"},
                 {"/hs formula", "удача/Spread и расчёт дропа по формуле"},
                 {"/hs fortune <MF> [BF]", "вручную: Mining + Block Fortune"},

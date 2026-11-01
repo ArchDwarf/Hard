@@ -20,6 +20,13 @@ public class TrackerData {
     public boolean hudShowTop = true;
     public int hudX = 4;
     public int hudY = 4;
+    public boolean hudBackground = true;
+    /** Скрытые строки HUD (ключи из HudRenderer.LINES) */
+    public List<String> hudHidden = new ArrayList<>(defaultHidden());
+
+    public static List<String> defaultHidden() {
+        return List.of("fortune", "blocks");
+    }
     /** Считать блоки в любом месте (для теста в одиночке), а не только в шахтах Hypixel */
     public boolean countEverywhere = false;
     /** Читать Mining Fortune / Block Fortune / Mining Spread из таб-листа */
@@ -75,6 +82,7 @@ public class TrackerData {
                 TrackerData d = GSON.fromJson(Files.readString(FILE, StandardCharsets.UTF_8), TrackerData.class);
                 if (d != null) {
                     if (d.trackedPlayers == null) d.trackedPlayers = new ArrayList<>();
+                    if (d.hudHidden == null) d.hudHidden = new ArrayList<>(defaultHidden());
                     if (d.sessions == null) d.sessions = new ArrayList<>();
                     if (d.hypixelApiKey == null) d.hypixelApiKey = "";
                     return d;
