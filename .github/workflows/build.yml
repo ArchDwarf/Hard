@@ -23,6 +23,22 @@ jobs:
           chmod +x gradlew
           set -o pipefail
           ./gradlew build --no-daemon 2>&1 | tee build.log
+      - name: API dump
+        if: always()
+        shell: bash
+        run: |
+          MC=$(find ~/.gradle/caches/fabric-loom -name 'minecraft-merged*.jar' | head -1)
+          {
+          for c in net.minecraft.client.gui.screens.Screen net.minecraft.client.gui.components.Button net.minecraft.client.gui.components.AbstractWidget net.minecraft.client.gui.components.events.GuiEventListener net.minecraft.client.input.MouseButtonEvent net.minecraft.client.gui.GuiGraphicsExtractor; do
+            echo "== $c"; javap -cp "$MC" "$c" 2>&1 | grep -E "public|protected" | grep -iE "mouse|render|extract|init|builder|bounds|onClose|setMessage|isPause|fill|text|outline|button\b|x\(|y\(|class|addRenderable|clear|tick" | head -40
+          done
+          } > api.txt 2>&1 || true
+          python3 - <<'PY'
+          t=open('api.txt').read()
+          for k in range(0, min(len(t), 40000), 3000):
+              part=t[k:k+3000].replace('%','%25').replace('\r','').replace('\n','%0A')
+              print(f'::warning title=api {k//3000:02d}::{part}')
+          PY
       - name: Report build errors
         if: failure()
         shell: bash
