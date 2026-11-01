@@ -54,7 +54,13 @@ public class CollectionTracker {
         }
         double hours = (last[0] - first[0]) / 3_600_000.0;
         if (hours <= 0) return -1;
-        return (last[1] - first[1]) / hours;
+        double rate = (last[1] - first[1]) / hours;
+        // рекорд — только по замерам не короче 10 минут, чтобы скачок API не дал ложный рекорд
+        if (last[0] - first[0] >= 10 * 60_000 && rate > data.bestApiPerHour) {
+            data.bestApiPerHour = rate;
+            data.save();
+        }
+        return rate;
     }
 
     /** true — давно (10+ мин) нет прироста в API: добыча, видимо, остановлена */

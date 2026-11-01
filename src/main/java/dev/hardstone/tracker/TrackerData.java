@@ -54,6 +54,8 @@ public class TrackerData {
     public long allTimeSackItems = 0;
     public long allTimeActiveMs = 0;
     public double bestBlocksPerHour = 0;
+    /** Рекорд Hard Stone в час по данным API (замер не короче 10 минут) */
+    public double bestApiPerHour = 0;
     public List<SessionRecord> sessions = new ArrayList<>();
 
     public static class SessionRecord {

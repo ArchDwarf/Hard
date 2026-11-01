@@ -72,8 +72,10 @@ public class HudRenderer {
         }
         lines.add(new Line("Время: " + Fmt.time(mining.sessionActiveMs) + (mining.isPaused() ? " (пауза)" : ""),
                 mining.isPaused() ? RED : WHITE));
-        lines.add(new Line("Рекорд/ч: " + Fmt.compact(data.bestBlocksPerHour)
-                + "  Всего: " + Fmt.compact(data.allTimeBlocks), GRAY));
+        if (collection.enabled()) {
+            lines.add(new Line("Рекорд в час: " + (data.bestApiPerHour > 0 ? Fmt.num(Math.round(data.bestApiPerHour)) + "/ч"
+                    : "ещё нет (нужно 10+ мин добычи)"), GRAY));
+        }
 
         {
             lines.add(new Line("Глобальный рейтинг: " + (globalRank.known() ? globalRank.describe()

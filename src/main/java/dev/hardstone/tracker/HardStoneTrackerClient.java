@@ -258,7 +258,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
         send(s, kv("Блоков", Fmt.num(data.allTimeBlocks)));
         send(s, kv("Дроп в сакс", Fmt.num(data.allTimeSackItems)));
         send(s, kv("Время добычи", Fmt.time(data.allTimeActiveMs)));
-        send(s, kv("Рекорд блоков/ч", Fmt.num(Math.round(data.bestBlocksPerHour)) + " (сессии от 5 мин)"));
+        send(s, kv("Рекорд в час (API)", Fmt.num(Math.round(data.bestApiPerHour))));
         return 1;
     }
 
