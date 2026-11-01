@@ -6,7 +6,11 @@ package dev.hardstone.tracker;
  * Минус: Hypixel обновляет данные API с задержкой (обычно 1–5 минут).
  */
 public class CollectionTracker {
-    private static final long INTERVAL_MS = 2 * 60_000;
+    /** Раз в 30 с = 10 запросов за 5 мин (лимит ключа Hypixel — 300 за 5 мин) */
+    private static final long INTERVAL_MS = 30_000;
+    /** Пауза после ответа 429 (лимит превышен) */
+    private static final long BACKOFF_MS = 5 * 60_000;
+    private volatile long backoffUntil = 0;
 
     private final TrackerData data;
     private final LeaderboardService api;
@@ -72,7 +76,8 @@ public class CollectionTracker {
     /** Секунд до следующего запроса к API, -1 если ещё не запрашивали */
     public long secondsUntilNext() {
         if (lastFetchMs == 0) return -1;
-        return Math.max(0, (lastFetchMs + INTERVAL_MS - System.currentTimeMillis()) / 1000);
+        long at = Math.max(lastFetchMs + INTERVAL_MS, backoffUntil);
+        return Math.max(0, (at - System.currentTimeMillis()) / 1000);
     }
     public String error() { return error; }
     public boolean enabled() { return !data.hypixelApiKey.isBlank(); }
@@ -84,7 +89,8 @@ public class CollectionTracker {
 
     public void tick(String selfName, boolean onHypixel) {
         if (!onHypixel || running || !enabled() || selfName == null) return;
-        if (System.currentTimeMillis() - lastFetchMs < INTERVAL_MS) return;
+        long now = System.currentTimeMillis();
+        if (now < backoffUntil || now - lastFetchMs < INTERVAL_MS) return;
         fetch(selfName);
     }
 
@@ -111,6 +117,9 @@ public class CollectionTracker {
                 error = null;
             } catch (LeaderboardService.ApiException e) {
                 error = e.getMessage();
+                if (e.getMessage() != null && e.getMessage().contains("лимит")) {
+                    backoffUntil = System.currentTimeMillis() + BACKOFF_MS;
+                }
             } catch (Exception e) {
                 error = "ошибка сети";
             } finally {
