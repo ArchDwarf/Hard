@@ -91,7 +91,7 @@ public class HudRenderer {
 
         double ph = collection.perHour();
         add(out, all, "perhour", "В час: " + (!api ? noKey : ph < 0 ? "считаю... (нужно 2 обновления API)"
-                : Fmt.num(Math.round(ph)) + "/ч" + (collection.idle() ? " (нет прироста 10+ мин)" : "")),
+                : Fmt.num(Math.round(ph)) + "/ч" + (collection.idle() ? " (нет прироста 1+ мин)" : "")),
                 collection.idle() ? GRAY : YELLOW);
 
         add(out, all, "record", "Рекорд в час: " + (data.bestApiPerHour > 0
