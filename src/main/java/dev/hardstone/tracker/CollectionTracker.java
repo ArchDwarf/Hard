@@ -24,7 +24,6 @@ public class CollectionTracker {
     /** Точки (время, значение) в моменты, когда коллекция в API изменилась */
     private final java.util.ArrayDeque<long[]> samples = new java.util.ArrayDeque<>();
     private static final long RATE_WINDOW_MS = 60 * 60_000;
-    private static final long IDLE_MS = 60_000;
 
     public CollectionTracker(TrackerData data, LeaderboardService api) {
         this.data = data;
@@ -69,7 +68,7 @@ public class CollectionTracker {
 
     /** true — давно (1+ мин) нет прироста в API: добыча, видимо, остановлена */
     public boolean idle() {
-        return lastChangeMs > 0 && System.currentTimeMillis() - lastChangeMs > IDLE_MS;
+        return lastChangeMs > 0 && System.currentTimeMillis() - lastChangeMs > data.apiIdleSeconds * 1000L;
     }
     public boolean isLoading() { return running; }
 

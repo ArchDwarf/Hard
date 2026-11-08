@@ -37,7 +37,7 @@ public class HudEditScreen extends Screen {
         int cols = 2;
         int rows = (keys.size() + cols - 1) / cols;
         panelW = cols * BTN_W + (cols - 1) * GAP;
-        panelH = rows * (BTN_H + GAP) + 6 + 20 + GAP + 20;
+        panelH = rows * (BTN_H + GAP) + 6 + 20 + GAP + 20 + GAP + 20;
         panelX = width - panelW - 8;
         panelY = Math.max(24, (height - panelH) / 2);
 
@@ -69,13 +69,47 @@ public class HudEditScreen extends Screen {
             clearWidgets();
             init();
         }).bounds(panelX + half + GAP, by, half, 20).build());
+        // AFK: −/+ и значение посередине
+        int ay = by + 20 + GAP;
+        int small = 30;
+        Button afkLabel = Button.builder(afkLabel(), b -> { }).bounds(panelX + small + GAP, ay,
+                panelW - 2 * (small + GAP), 20).build();
+        afkLabel.active = false;
+        addRenderableWidget(Button.builder(Component.literal("−"), b -> {
+            changeAfk(-1);
+            afkLabel.setMessage(afkLabel());
+        }).bounds(panelX, ay, small, 20).build());
+        addRenderableWidget(afkLabel);
+        addRenderableWidget(Button.builder(Component.literal("+"), b -> {
+            changeAfk(+1);
+            afkLabel.setMessage(afkLabel());
+        }).bounds(panelX + panelW - small, ay, small, 20).build());
+
         addRenderableWidget(Button.builder(Component.literal("Готово"), b -> onClose())
-                .bounds(panelX, by + 20 + GAP, panelW, 20).build());
+                .bounds(panelX, ay + 20 + GAP, panelW, 20).build());
     }
 
     private Component label(String key, String name) {
         boolean on = !data.hudHidden.contains(key);
         return Component.literal((on ? "§a✔ " : "§c✘ ") + "§r" + name);
+    }
+
+    private static final int[] AFK_STEPS = {10, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1800, 3600};
+
+    private void changeAfk(int dir) {
+        int cur = data.afkSeconds;
+        int next = dir > 0 ? AFK_STEPS[AFK_STEPS.length - 1] : AFK_STEPS[0];
+        if (dir > 0) {
+            for (int st : AFK_STEPS) if (st > cur) { next = st; break; }
+        } else {
+            for (int st : AFK_STEPS) if (st < cur) next = st;
+        }
+        data.afkSeconds = next;
+        data.apiIdleSeconds = next;
+    }
+
+    private Component afkLabel() {
+        return Component.literal("AFK через: " + Fmt.dur(data.afkSeconds));
     }
 
     private Component bgLabel() {

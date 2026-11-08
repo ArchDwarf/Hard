@@ -51,6 +51,8 @@ public class TrackerData {
     public long menuCollection = 0;
     /** Секунд без добычи, после которых таймер сессии встаёт на паузу */
     public int afkSeconds = 60;
+    /** Через сколько секунд без прироста коллекции в API считать AFK (строка «В час» сереет) */
+    public int apiIdleSeconds = 60;
     public String hypixelApiKey = "";
     public List<String> trackedPlayers = new ArrayList<>();
     /** path официального лидерборда Hypixel; пусто = искать Hard Stone автоматически */

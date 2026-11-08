@@ -25,6 +25,13 @@ final class Fmt {
         return mmss(sec);
     }
 
+    /** 45 → "45 с", 90 → "1 мин 30 с", 300 → "5 мин" */
+    static String dur(long sec) {
+        if (sec < 60) return sec + " с";
+        long m = sec / 60, s = sec % 60;
+        return s == 0 ? m + " мин" : m + " мин " + s + " с";
+    }
+
     static String time(long ms) {
         long s = ms / 1000;
         return String.format(Locale.ROOT, "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60);

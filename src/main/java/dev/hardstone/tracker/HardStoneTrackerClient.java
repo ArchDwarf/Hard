@@ -150,8 +150,9 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 }))
                 .then(literal("afk").then(argument("seconds", IntegerArgumentType.integer(10, 3600)).executes(c -> {
                     data.afkSeconds = IntegerArgumentType.getInteger(c, "seconds");
+                    data.apiIdleSeconds = data.afkSeconds;
                     data.save();
-                    ok(c, "Пауза таймера после " + data.afkSeconds + " с без добычи.");
+                    ok(c, "AFK через " + Fmt.dur(data.afkSeconds) + " без добычи (таймер сессии и строка «В час»).");
                     return 1;
                 })))
                 .then(literal("hud")
@@ -242,7 +243,7 @@ public class HardStoneTrackerClient implements ClientModInitializer {
                 {"/hs hud", "вкл/выкл HUD"},
                 {"/hs hud top", "вкл/выкл топ на HUD"},
                 {"/hs hud pos <x> <y>", "позиция HUD"},
-                {"/hs afk <сек>", "пауза таймера при простое"},
+                {"/hs afk <сек>", "через сколько считать AFK (10–3600 с)"},
                 {"/hs anywhere", "считать вне шахт (тест)"},
         };
         send(c.getSource(), header("Hard Stone Tracker — команды"));
